@@ -1,0 +1,64 @@
+CREATE TABLE clips (
+	id TEXT NOT NULL PRIMARY KEY,
+	fps INTEGER NOT NULL,
+	frame_count UNSIGNED INTEGER NOT NULL,
+	start_date DATETIME NOT NULL,
+	begin_weight REAL NOT NULL,
+	end_weight REAL NOT NULL,
+);
+
+CREATE TABLE persons (
+	id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+	name TEXT NOT NULL,
+	signup_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE embeddings (
+	id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+	user_id INTEGER NOT NULL,
+	embedding TEXT NOT NULL, -- JSON
+	upload_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+	FOREIGN KEY (user_id) REFERENCES persons(id) ON DELETE CASCADE
+);
+
+CREATE TABLE login_sessions (
+	id TEXT NOT NULL PRIMARY KEY,
+	person_id INTEGER NOT NULL,
+	date_created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+	FOREIGN KEY (person_id) REFERENCES persons(id) ON DELETE CASCADE
+);
+
+CREATE TABLE transactions (
+	id TEXT NOT NULL PRIMARY KEY,
+	grab_id INTEGER NOT NULL,
+	grabbed_for INTEGER,
+	amount INTEGER NOT NULL,
+	pending BOOLEAN NOT NULL,
+
+	FOREIGN KEY (grab_id) REFERENCES grabs(id) ON DELETE CASCADE,
+	FOREIGN KEY (grabbed_for) REFERENCES persons(id)
+);
+
+CREATE TABLE grabs (
+	id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+	clip_id TEXT NOT NULL,
+	grabber_guess INTEGER NOT NULL,
+	guess_certainty REAL NOT NULL,
+	date_guessed DATETIME NOT NULL,
+	grabber_manual INTEGER,
+	date_grabber_given DATETIME,
+
+	FOREIGN KEY (clip_id) REFERENCES clips(id) ON DELETE CASCADE,
+	FOREIGN KEY (grabber_guess) REFERENCES persons(id),
+	FOREIGN KEY (grabber_manual) REFERENCES persons(id)
+);
+
+CREATE TABLE meta (
+	key TEXT NOT NULL PRIMARY KEY,
+	value TEXT
+);
+
+INSERT INTO meta(key, value) VALUES("schema_version", "1");
+INSERT INTO meta(key, value) VALUES("beer_weight_grams", "15");
