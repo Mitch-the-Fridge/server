@@ -388,7 +388,8 @@ func main() {
 	router.GET("/me", meHandler)
 	router.POST("/me", signupHandler)
 
-	router.POST("/me/embedding", embeddingHandler)
+	router.GET("/me/embeddings", embeddingsGetHandler)
+	router.POST("/me/embeddings", embeddingsPostHandler)
 
 	log.Fatal(http.ListenAndServe(":"+port, router))
 }

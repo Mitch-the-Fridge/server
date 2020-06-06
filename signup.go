@@ -62,7 +62,24 @@ func signupHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 	w.WriteHeader(http.StatusCreated)
 }
 
-func embeddingHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func embeddingsGetHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	user, good := getUserByRequest(w, r)
+	if !good {
+		return
+	}
+
+	embeddings, err := database.GetUserEmbeddings(user.ID)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	w.WriteHeader(200)
+	encoder := json.NewEncoder(w)
+	encoder.Encode(embeddings)
+}
+
+func embeddingsPostHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	user, good := getUserByRequest(w, r)
 	if !good {
 		return
