@@ -2,7 +2,6 @@ package main
 
 import (
 	"archive/tar"
-	"bufio"
 	"database/sql"
 	"encoding/json"
 	"io"
@@ -11,10 +10,8 @@ import (
 	"math"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"server-entry/db"
@@ -23,22 +20,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type QueueItem struct {
-	ID        string `json:"id"`
-	Directory string `json:"dir"`
-}
-type EmbeddingQueueItem struct {
-	UserID   int64     `json:"user_id"`
-	Encoding []float64 `json:"encoding"`
-}
-
 var (
-	// REVIEW
-	faceRecognitionQueue chan QueueItem          = make(chan QueueItem, 5)
-	embeddingQueue       chan EmbeddingQueueItem = make(chan EmbeddingQueueItem)
-
-	doneChannel chan string = make(chan string)
-
 	database db.DB
 
 	videoDir string
@@ -169,10 +151,20 @@ func clipsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		return
 	}
 
-	faceRecognitionQueue <- QueueItem{
-		ID:        blobInfo.UUID,
-		Directory: tmpDir,
-	}
+	go func() {
+		_, err := sendToNode(ClipRequest{
+			ID:        blobInfo.UUID,
+			Directory: tmpDir,
+		})
+		if err != nil {
+			log.Printf("[ERR] error while processing clip %s: %s", blobInfo.UUID, err.Error())
+			return
+		}
+
+		log.Printf("[INF] done processing clip %s", blobInfo.UUID)
+
+		insertTransaction(blobInfo.UUID)
+	}()
 }
 
 func videoHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
@@ -225,119 +217,48 @@ func meHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	encoder.Encode(user)
 }
 
-func spawnNode() error {
-	cmd := exec.Command(
-		"nice",
-		"-n10",
-
-		"node",
-		"index.mjs",
-		"../"+DB_PATH,
-	)
-	workdir, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	cmd.Dir = filepath.Join(workdir, "node")
-
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return err
-	}
-	go func() {
-		for {
-			var obj interface{}
-			var char byte
-
-			select {
-			case embedding := <-embeddingQueue:
-				obj = embedding
-				char = 'E'
-			case item := <-faceRecognitionQueue:
-				obj = item
-				char = 'W'
-			}
-
-			item, err := json.Marshal(obj)
-			if err != nil {
-				panic(err)
-			}
-
-			bytes := []byte{char}
-			bytes = append(bytes, item...)
-			bytes = append(bytes, '\n')
-
-			stdin.Write(bytes)
-		}
-	}()
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	go func() {
-		reader := bufio.NewReader(stdout)
-		for {
-			id, err := reader.ReadString('\n')
-			if err == io.EOF {
-				return
-			} else if err != nil {
-				panic(err)
-			}
-
-			doneChannel <- strings.TrimSpace(id)
-		}
-	}()
-
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
-}
-
-func transactionLoop() {
+func insertTransaction(id string) {
 	// TODO: actually allow people to grab beers for others.
 
-	for id := range doneChannel {
-		log.Printf("received clip %s as being processed from node", id)
+	log.Printf("received clip %s as being processed from node", id)
 
-		clip, found, err := database.GetClip(id)
-		if !found {
-			log.Fatalf("clip with id %s not found during transactionLoop!", id)
-		} else if err != nil {
-			panic(err)
-		}
-
-		weightDiff := math.Abs(clip.EndWeight - clip.BeginWeight)
-		meta, err := database.GetMeta()
-		if err != nil {
-			panic(err)
-		}
-		beerCount := math.Round(weightDiff / float64(meta.BeerWeightGrams))
-
-		grab, found, err := database.GetGrabForClip(id)
-		if !found {
-			log.Fatalf("grab for clip with id %s not found during transactionLoop!", id)
-		} else if err != nil {
-			panic(err)
-		}
-
-		res, err := database.InsertTransaction(db.Transaction{
-			GrabID:     grab.ID,
-			GrabbedFor: grab.GrabberGuess,
-			Amount:     int64(beerCount),
-			Pending:    false,
-		})
-		if err != nil {
-			panic(err)
-		}
-
-		transId, err := res.LastInsertId()
-		if err != nil {
-			panic(err)
-		}
-
-		log.Printf("inserted transaction %d for clip %s", transId, id)
+	clip, found, err := database.GetClip(id)
+	if !found {
+		log.Fatalf("clip with id %s not found during insertTransaction!", id)
+	} else if err != nil {
+		panic(err)
 	}
+
+	weightDiff := math.Abs(clip.EndWeight - clip.BeginWeight)
+	meta, err := database.GetMeta()
+	if err != nil {
+		panic(err)
+	}
+	beerCount := math.Round(weightDiff / float64(meta.BeerWeightGrams))
+
+	grab, found, err := database.GetGrabForClip(id)
+	if !found {
+		log.Fatalf("grab for clip with id %s not found during insertTransaction!", id)
+	} else if err != nil {
+		panic(err)
+	}
+
+	res, err := database.InsertTransaction(db.Transaction{
+		GrabID:     grab.ID,
+		GrabbedFor: grab.GrabberGuess,
+		Amount:     int64(beerCount),
+		Pending:    false,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	transId, err := res.LastInsertId()
+	if err != nil {
+		panic(err)
+	}
+
+	log.Printf("inserted transaction %d for clip %s", transId, id)
 }
 
 func main() {
@@ -376,8 +297,6 @@ func main() {
 			panic(err)
 		}
 	}()
-
-	go transactionLoop()
 
 	router := httprouter.New()
 	router.GET("/", rootHandler)

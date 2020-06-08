@@ -107,10 +107,11 @@ async function handleDirectory(knn, clip) {
 	log("clip", clip.id, userId, confidences, "rat after compact", ratAfterCompact);
 	await db.insertGrab(clip.id, userId, confidences[userId]);
 
-	// signal to the Go process that we're done processing this clip
-	console.log(clip.id);
-
-	await fs.rmdir(clip.dir, { recursive: true });
+	try {
+		await fs.rmdir(clip.dir, { recursive: true });
+	} catch (e) {
+		log('error while removing frames folder', e);
+	}
 }
 
 async function handleFrame(fname) {
@@ -165,18 +166,34 @@ async function updateClassifier(knn, obj) {
 	});
 
 	rl.on('line', str => {
-		const obj = JSON.parse(str.slice(1));
+		const obj = JSON.parse(str);
 
-		switch (str[0]) {
-		case 'W':
+		let promise;
+		switch (obj.type) {
+		case 'clip':
 			log('working on', obj);
-			handleDirectory(knn, obj);
+			promise = handleDirectory(knn, obj.item);
 			break;
-		case 'E':
+		case 'train_embedding':
 			log('train classifier request', obj);
-			updateClassifier(knn, obj);
+			promise = updateClassifier(knn, obj.item);
 			break;
 		}
+
+		promise.then(res => {
+			console.log(JSON.stringify({
+				id: obj.id,
+				// HACK
+				result: JSON.stringify(res),
+				error: null,
+			}));
+		}, err => {
+			console.log(JSON.stringify({
+				id: obj.id,
+				result: null,
+				error: err.toString(),
+			}));
+		})
 	});
 
 	return 0;
