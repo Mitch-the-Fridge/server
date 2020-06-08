@@ -95,8 +95,6 @@ func embeddingsPostHandler(w http.ResponseWriter, r *http.Request, _ httprouter.
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-
 	if _, err := sendToNode(AddEmbeddingRequest{
 		UserID:   user.ID,
 		Encoding: embedding,
@@ -104,4 +102,6 @@ func embeddingsPostHandler(w http.ResponseWriter, r *http.Request, _ httprouter.
 		http.Error(w, err.Error(), 500)
 		return
 	}
+
+	w.WriteHeader(http.StatusCreated)
 }
