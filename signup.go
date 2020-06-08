@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -38,15 +37,7 @@ func signupHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 		return
 	}
 
-	sessionUUID, err := uuid.NewRandom()
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-
-	sessionId := sessionUUID.String()
-
-	_, err = database.DB.Exec("INSERT INTO login_sessions(id, person_id) values(?, ?)", sessionId, accountId)
+	sessionId, err := generateSession(accountId)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return

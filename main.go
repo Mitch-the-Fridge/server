@@ -305,7 +305,8 @@ func main() {
 	router.GET("/clips/:id", clipsGetHandler)
 
 	router.GET("/me", meHandler)
-	router.POST("/me", signupHandler)
+	router.POST("/signup", signupHandler)
+	router.POST("/login", loginHandler)
 
 	router.GET("/me/embeddings", embeddingsGetHandler)
 	router.POST("/me/embeddings", embeddingsPostHandler)

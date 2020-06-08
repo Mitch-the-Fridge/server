@@ -141,6 +141,16 @@ async function updateClassifier(knn, obj) {
 	await db.setKNNModel(model);
 }
 
+async function handleLogin(knn, obj) {
+	const embedding = tf.tensor(obj.embedding);
+	const {label: userId, confidences} = await knn.predictClass(embedding);
+
+	return {
+		'user_id': userId,
+		'confidence': confidences[userId],
+	};
+}
+
 (async function() {
 	await Promise.all([
 		faceapi.nets.ssdMobilenetv1.loadFromDisk('./face-api.js/weights'),
@@ -170,6 +180,10 @@ async function updateClassifier(knn, obj) {
 
 		let promise;
 		switch (obj.type) {
+		case 'login':
+			log('login request', obj);
+			promise = handleLogin(knn, obj.item);
+			break;
 		case 'clip':
 			log('working on', obj);
 			promise = handleDirectory(knn, obj.item);
