@@ -61,6 +61,7 @@ func sendToNode(item QueueableItem) ([]byte, error) {
 	requestResponseMap[id] = ch
 
 	itemQueue <- QueueItem{
+		ID:   id,
 		Type: item.GetOperation(),
 		Item: item,
 	}
