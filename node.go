@@ -133,10 +133,11 @@ func spawnNode() error {
 
 			item, has := requestResponseMap[output.ID]
 			if !has {
-				log.Printf("[WARN] done with id %s but no request response waiter found, ignoring...", output.ID)
+				log.Printf("[WARN] done with task with id %s but no request response waiter found, ignoring...", output.ID)
 				continue
 			}
 
+			log.Printf("[INF] done with task with id %s", output.ID)
 			item <- Result{
 				ID:     output.ID,
 				Err:    errors.New(output.Error),
