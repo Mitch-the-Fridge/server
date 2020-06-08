@@ -1,4 +1,4 @@
-package main
+package ffmpeg
 
 import (
 	"os/exec"
@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	codec = "libx264"
+	video_codec = "libx264"
 )
 
 // MakeVideo creates a mp4 video from the given frames in the given dir and
@@ -25,7 +25,7 @@ func MakeVideo(inputDir, ext, output string, fps int) error {
 		"-threads",
 		"0",
 		"-c:v",
-		codec,
+		video_codec,
 		output,
 	)
 	cmd.Dir = inputDir

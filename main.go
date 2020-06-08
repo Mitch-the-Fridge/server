@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"server-entry/db"
+	"server-entry/ffmpeg"
 
 	"github.com/julienschmidt/httprouter"
 	_ "github.com/mattn/go-sqlite3"
@@ -23,17 +24,19 @@ import (
 var (
 	database db.DB
 
-	videoDir string
+	videosDir  string
+	avatarsDir string
 )
 
 const (
-	OUTPUT_DIR = "./videos/"
-	DB_PATH    = "./database.db"
+	VIDEOS_DIR  = "./videos/"
+	AVATARS_DIR = "./avatars/"
+	DB_PATH     = "./database.db"
 )
 
 type FrameInfo struct {
-	Millis        int64   `json:"time"`
-	FaceLocations [][]int `json:"face_locations"`
+	Millis int64 `json:"time"`
+	//FaceLocations [][]int `json:"face_locations"`
 	CurrentWeight float64 `json:"current_weight"` // I guess??
 }
 
@@ -129,8 +132,8 @@ func clipsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		}
 	}
 
-	output := filepath.Join(videoDir, blobInfo.UUID+".mp4")
-	if err := MakeVideo(tmpDir, extension, output, blobInfo.FPS); err != nil {
+	output := filepath.Join(videosDir, blobInfo.UUID+".mp4")
+	if err := ffmpeg.MakeVideo(tmpDir, extension, output, blobInfo.FPS); err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
@@ -168,7 +171,7 @@ func clipsHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 }
 
 func videoHandler(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	fname := filepath.Join(videoDir, ps.ByName("id")+".mp4")
+	fname := filepath.Join(videosDir, ps.ByName("id")+".mp4")
 
 	f, err := os.Open(fname)
 	if err != nil {
@@ -264,7 +267,11 @@ func insertTransaction(id string) {
 func main() {
 	var err error
 
-	videoDir, err = filepath.Abs(OUTPUT_DIR)
+	videosDir, err = filepath.Abs(VIDEOS_DIR)
+	if err != nil {
+		panic(err)
+	}
+	avatarsDir, err = filepath.Abs(AVATARS_DIR)
 	if err != nil {
 		panic(err)
 	}
