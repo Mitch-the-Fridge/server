@@ -14,7 +14,7 @@
     "@tensorflow/tfjs-node": "^1.7.4",
     "canvas": "^2.6.1",
     "face-api.js": "^0.22.2",
-    "lodash": "^4.17.15",
+    "lodash": "^4.17.19",
     "sqlite3": "^4.2.0"
   }
 }
